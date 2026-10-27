@@ -1,0 +1,128 @@
+[build-system]
+requires = ["hatchling", "hatch-vcs", "nipreps-versions"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mriqc-flyte"
+description = "MRIQC's image quality workflows ported from nipype to the Flyte 2 orchestrator."
+readme = "README.rst"
+authors = [{name = "The NiPreps Developers", email = "nipreps@gmail.com"}]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "Intended Audience :: Science/Research",
+  "Topic :: Scientific/Engineering :: Image Recognition",
+  "Programming Language :: Python :: 3.12",
+]
+license = "Apache-2.0"
+license-files = ["LICEN[CS]E*", "NOTICE"]
+requires-python = ">=3.12"
+dependencies = [
+  # Flyte 2 releases every one or two weeks: stay on one minor version.
+  "flyte ~= 2.12.1",
+  # Pinned to the MRIQC commit that the issues' code pointers refer to.
+  "mriqc @ git+https://github.com/nipreps/mriqc.git@f61290947f6aa79e143e38e314bfd63c09d7384f",
+]
+dynamic = ["version"]
+
+[project.urls]
+Home = "https://github.com/nipreps/mriqc-flyte"
+MRIQC = "https://github.com/nipreps/mriqc"
+NiPreps = "https://www.nipreps.org/"
+
+[project.optional-dependencies]
+dev = [
+  "pre-commit",
+  "ruff",
+]
+test = [
+  "coverage",
+  "pytest >= 8",
+  "pytest-asyncio",
+  "pytest-cov",
+  "pytest-env",
+]
+
+# Aliases
+tests = ["mriqc-flyte[test]"]
+all = ["mriqc-flyte[dev,test]"]
+
+#
+# Hatch configurations
+#
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+  ".git_archival.txt",
+  "/.github",
+  "/.pre-commit-config.yaml",
+  "/AGENTS.md",
+  "/CONTRIBUTING.md",
+  "/docs",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mriqc_flyte"]
+
+[tool.hatch.version]
+validate-bump = true
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+version_scheme = "nipreps-calver"
+local_scheme = "no-local-version"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/mriqc_flyte/_version.py"
+
+#
+# Developer tool configurations
+#
+
+[tool.ruff]
+line-length = 99
+target-version = "py312"
+
+[tool.ruff.lint]
+select = [
+  "F",
+  "E",
+  "C",
+  "W",
+  "B",
+  "I",
+  "ICN",
+]
+ignore = [
+  "E203",
+]
+
+[tool.ruff.lint.extend-per-file-ignores]
+"*/__init__.py" = ["F401"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.ruff.lint.flake8-import-conventions.extend-aliases]
+"nibabel" = "nb"
+
+[tool.ruff.lint.isort]
+known-first-party = ["mriqc_flyte"]
+
+[tool.pytest.ini_options]
+pythonpath = "src/ test/"
+norecursedirs = [".*", "_*"]
+addopts = "-v --doctest-modules --strict-markers"
+doctest_optionflags = "ALLOW_UNICODE NORMALIZE_WHITESPACE ELLIPSIS"
+env = "PYTHONHASHSEED=0"
+markers = [
+  "baseline: needs the nipype baseline outputs (set MRIQC_FLYTE_BASELINE)",
+  "binaries: needs ANTs, AFNI and SynthStrip on the PATH (run in the dev container)",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["src/mriqc_flyte"]
+omit = ["src/mriqc_flyte/_version.py"]

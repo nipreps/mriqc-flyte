@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: MRIQC (the supported tool)
+    url: https://github.com/nipreps/mriqc/issues
+    about: Problems with MRIQC itself go to the MRIQC tracker.
