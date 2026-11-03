@@ -9,6 +9,7 @@ on:
       - 'Dockerfile'
       - '.dockerignore'
       - 'docker-bake.hcl'
+      - '.maint/image_versions.py'
       - 'pyproject.toml'
       - '.github/workflows/docker.yml'
   pull_request:
@@ -17,6 +18,7 @@ on:
       - 'Dockerfile'
       - '.dockerignore'
       - 'docker-bake.hcl'
+      - '.maint/image_versions.py'
       - 'pyproject.toml'
       - '.github/workflows/docker.yml'
   workflow_dispatch:
@@ -75,14 +77,22 @@ jobs:
           base="$REGISTRY:base-${MRIQC_SHA:0:8}"
           if docker buildx imagetools inspect "$base" > /dev/null 2>&1; then
             echo "Reusing $base"
-            args=(dev --set "dev.contexts.base=docker-image://$base")
+            targets=(dev)
+            args=(--set "dev.contexts.base=docker-image://$base")
           else
-            args=(base dev)
+            targets=(base dev)
+            args=()
           fi
+          # First pass: build, and read the versions the dev image recorded
+          docker buildx bake --progress plain "${args[@]}" versions
+          VERSIONS="$(cat versions/versions.json)"
+          export VERSIONS
+          # Second pass, all cached: the same images, with the versions as labels
+          docker buildx bake --print "${args[@]}" dev | jq .target.dev.labels
           if [[ "${{ github.event_name }}" != pull_request ]]; then
             args+=(--push)
           fi
-          docker buildx bake --progress plain "${args[@]}"
+          docker buildx bake --progress plain "${args[@]}" "${targets[@]}"
 
       - name: Disk usage after the build
         if: always()

@@ -28,13 +28,14 @@ RUN tf_home="$(python -c 'from templateflow.conf import TF_HOME; print(TF_HOME)'
     && echo "TemplateFlow cache: $tf_home" \
     && chmod -R a+rwX "$tf_home"
 
-# The checks of issue #1: the build fails if a tool is missing.
-RUN N4BiasFieldCorrection --version \
-    && antsRegistration --version \
-    && 3dFWHMx -help > /dev/null \
-    && afni -ver \
-    && synthstrip -h > /dev/null \
-    && python -c "import flyte, mriqc; print('flyte', flyte.__version__, 'mriqc', mriqc.__version__); assert mriqc.__version__ != '0.0'"
+# The checks of issue #1: the build fails if a tool is missing. They also record the versions
+# of the tools and main packages in /opt/mriqc-flyte/versions.json, which the workflow copies
+# into the image labels, and the full package lists next to it.
+COPY .maint/image_versions.py /tmp/
+RUN python /tmp/image_versions.py /opt/mriqc-flyte/versions.json \
+    && python -m pip list --format=freeze > /opt/mriqc-flyte/pip-freeze.txt \
+    && micromamba list -n base > /opt/mriqc-flyte/micromamba-list.txt \
+    && rm /tmp/image_versions.py
 
 ENV PYTHONPATH=/work/src
 WORKDIR /work

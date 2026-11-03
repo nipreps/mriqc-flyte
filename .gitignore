@@ -129,3 +129,6 @@ local-cache/
 # Baseline data and scratch space (never commit)
 baseline/
 scratch/
+
+# Versions extracted from the dev image (docker buildx bake versions)
+/versions/

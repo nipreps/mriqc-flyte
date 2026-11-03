@@ -37,7 +37,9 @@ From a clone of this repository:
 The repository is mounted at ``/work`` and found through ``PYTHONPATH``, so there is nothing to
 install. The image is amd64 only (as MRIQC's): on Apple-silicon Macs, enable Rosetta in Docker
 Desktop. It is built by the *Dev container* workflow from ``Dockerfile`` and
-``docker-bake.hcl``. The onboarding issues (label ``onboarding``) take it from there.
+``docker-bake.hcl``. The versions of its tools and main packages are in the image labels
+(``docker inspect``) and in ``/opt/mriqc-flyte/versions.json``, with the full package lists
+beside it. The onboarding issues (label ``onboarding``) take it from there.
 
 Contributing
 ------------
