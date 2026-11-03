@@ -1,0 +1,99 @@
+name: Dev container
+
+# Builds the dev container (see Dockerfile and docker-bake.hcl). Pull requests only build it;
+# pushes to main and manual runs also publish it to the GitHub Container Registry.
+on:
+  push:
+    branches: ['main']
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'docker-bake.hcl'
+      - '.maint/image_versions.py'
+      - 'pyproject.toml'
+      - '.github/workflows/docker.yml'
+  pull_request:
+    branches: ['main']
+    paths:
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'docker-bake.hcl'
+      - '.maint/image_versions.py'
+      - 'pyproject.toml'
+      - '.github/workflows/docker.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Read the MRIQC commit pinned in pyproject.toml
+        id: pin
+        run: |
+          sha=$(grep -oE 'mriqc\.git@[0-9a-f]{40}' pyproject.toml | cut -d@ -f2)
+          test -n "$sha"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v5
+        with:
+          repository: nipreps/mriqc
+          ref: ${{ steps.pin.outputs.sha }}
+          # MRIQC's wheel takes its version from the git tags
+          fetch-depth: 0
+          path: mriqc
+
+      - name: Free disk space (the MRIQC image needs about 30 GB while building)
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache \
+            /usr/local/share/boost
+          docker system prune -af
+          df -h /
+
+      - name: Set up buildx
+        run: docker buildx create --use --driver docker-container
+
+      - name: Log in to the GitHub Container Registry
+        if: github.event_name != 'pull_request'
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Build, and push outside pull requests
+        env:
+          MRIQC_SHA: ${{ steps.pin.outputs.sha }}
+          REGISTRY: ghcr.io/${{ github.repository }}
+          SOURCE: ${{ github.server_url }}/${{ github.repository }}
+        run: |
+          export REGISTRY="${REGISTRY,,}" DATE="$(date -u +%Y%m%d)"
+          base="$REGISTRY:base-${MRIQC_SHA:0:8}"
+          if docker buildx imagetools inspect "$base" > /dev/null 2>&1; then
+            echo "Reusing $base"
+            targets=(dev)
+            args=(--set "dev.contexts.base=docker-image://$base")
+          else
+            targets=(base dev)
+            args=()
+          fi
+          # First pass: build, and read the versions the dev image recorded
+          docker buildx bake --progress plain "${args[@]}" versions
+          VERSIONS="$(cat versions/versions.json)"
+          export VERSIONS
+          # Second pass, all cached: the same images, with the versions as labels
+          docker buildx bake --print "${args[@]}" dev | jq .target.dev.labels
+          if [[ "${{ github.event_name }}" != pull_request ]]; then
+            args+=(--push)
+          fi
+          docker buildx bake --progress plain "${args[@]}" "${targets[@]}"
+
+      - name: Disk usage after the build
+        if: always()
+        run: df -h /

@@ -11,11 +11,13 @@ classifiers = [
   "Development Status :: 2 - Pre-Alpha",
   "Intended Audience :: Science/Research",
   "Topic :: Scientific/Engineering :: Image Recognition",
+  "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
 ]
 license = "Apache-2.0"
 license-files = ["LICEN[CS]E*", "NOTICE"]
-requires-python = ">=3.12"
+# 3.11 is the Python of MRIQC's image, which the dev container builds on.
+requires-python = ">=3.11"
 dependencies = [
   # Flyte 2 releases every one or two weeks: stay on one minor version.
   "flyte ~= 2.12.1",
@@ -83,7 +85,7 @@ version-file = "src/mriqc_flyte/_version.py"
 
 [tool.ruff]
 line-length = 99
-target-version = "py312"
+target-version = "py311"
 
 [tool.ruff.lint]
 select = [

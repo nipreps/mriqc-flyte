@@ -24,13 +24,17 @@ jobs:
   test:
     # Unit tests only: tests marked `baseline` or `binaries` run in the dev container.
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # 3.11 is the dev container's Python
+        python-version: ['3.11', '3.12']
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
       - uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
+          python-version: ${{ matrix.python-version }}
       - name: Install (CPU-only torch keeps the download small)
         run: |
           python -m pip install -U pip

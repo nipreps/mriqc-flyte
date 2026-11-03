@@ -1,0 +1,4 @@
+# The image only needs the dependency list and the version check
+*
+!pyproject.toml
+!.maint/image_versions.py
