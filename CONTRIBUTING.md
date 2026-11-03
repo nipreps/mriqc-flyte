@@ -20,9 +20,10 @@ whose contributing guidelines apply. This file adds the conventions specific to 
 - One issue per pull request, unless the issue says otherwise.
 
 ## Before opening a pull request
+Inside the dev container (see the README):
 ```bash
-pipx run ruff format --diff   # must print nothing
-pipx run ruff check
+ruff format --diff   # must print nothing
+ruff check
 pytest
 ```
 Tests that need the baseline data or the neuroimaging binaries carry the `baseline` or

@@ -48,7 +48,12 @@ target "dev" {
   args      = { BASE_IMAGE = "base" }
   platforms = ["linux/amd64"]
   labels = merge(
-    { "org.opencontainers.image.source" = SOURCE },
+    {
+      "org.opencontainers.image.source" = SOURCE
+      # Otherwise inherited from Ubuntu's base image (`22.04`, `ubuntu`)
+      "org.opencontainers.image.version"  = notequal(DATE, "") ? "dev-${DATE}" : "dev"
+      "org.opencontainers.image.ref.name" = "dev"
+    },
     { for name, value in jsondecode(VERSIONS) : "org.nipreps.mriqc-flyte.${name}" => value },
   )
   tags = compact(["${REGISTRY}:dev", notequal(DATE, "") ? "${REGISTRY}:dev-${DATE}" : ""])

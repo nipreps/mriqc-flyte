@@ -33,8 +33,12 @@ NiPreps = "https://www.nipreps.org/"
 
 [project.optional-dependencies]
 dev = [
+  # The TUI of `flyte run --tui`
+  "flyte[tui]",
   "pre-commit",
-  "ruff",
+  # Pinned, so that the dev container and CI format alike. CI reads the version from here;
+  # keep .pre-commit-config.yaml in step.
+  "ruff == 0.17.3",
 ]
 test = [
   "coverage",
