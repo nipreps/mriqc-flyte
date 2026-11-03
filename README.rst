@@ -41,6 +41,32 @@ Desktop. It is built by the *Dev container* workflow from ``Dockerfile`` and
 (``docker inspect``) and in ``/opt/mriqc-flyte/versions.json``, with the full package lists
 beside it. The onboarding issues (label ``onboarding``) take it from there.
 
+The baseline
+~~~~~~~~~~~~
+The tests compare the port with the **baseline**: standard MRIQC run twice on the test T1w
+(sub-50137 of MRIQC's CI dataset), keeping every node's outputs. It is published as the
+pre-release ``baseline-t1w-f6129094``, which also lists the run-to-run differences (the noise
+floor). Download and unpack it once:
+
+.. code-block:: bash
+
+   url=https://github.com/nipreps/mriqc-flyte/releases/download/baseline-t1w-f6129094
+   mkdir -p baseline && cd baseline
+   for f in bids.tar.gz run-1.tar.gz run-2.tar.gz SHA256SUMS; do curl -fLO "$url/$f"; done
+   shasum -a 256 -c SHA256SUMS && for f in *.tar.gz; do tar -xzf "$f"; done
+   cd ..
+
+Then mount it at ``/baseline`` and point ``MRIQC_FLYTE_BASELINE`` to it. The baseline was
+produced there, so the paths stored in its result files resolve as they are:
+
+.. code-block:: bash
+
+   docker run --rm -it --platform linux/amd64 -u "$(id -u):$(id -g)" \
+       -v "$PWD":/work -v "$PWD/baseline":/baseline:ro -e MRIQC_FLYTE_BASELINE=/baseline \
+       ghcr.io/nipreps/mriqc-flyte:dev
+
+The tests that need it are skipped when ``MRIQC_FLYTE_BASELINE`` is unset, as on GitHub Actions.
+
 Contributing
 ------------
 See `CONTRIBUTING.md <CONTRIBUTING.md>`__. This project follows the
