@@ -18,8 +18,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - run: pipx run ruff format --diff
-      - run: pipx run ruff check
+      - name: Read the ruff version pinned in pyproject.toml (the dev container's)
+        run: echo "RUFF=$(grep -oE '"ruff == [0-9.]+"' pyproject.toml | tr -d '" ')" >> "$GITHUB_ENV"
+      - run: pipx run --spec "$RUFF" ruff format --diff
+      - run: pipx run --spec "$RUFF" ruff check
 
   test:
     # Unit tests only: tests marked `baseline` or `binaries` run in the dev container.
