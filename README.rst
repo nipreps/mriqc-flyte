@@ -25,13 +25,19 @@ and `docs/primer.md <docs/primer.md>`__ for a primer on MRIQC and Flyte.
 Getting started
 ---------------
 Development happens inside the dev container, which provides ANTs, AFNI, SynthStrip and
-Python 3.12 with this package's dependencies. Instructions are in the onboarding issues
-(label ``onboarding``).
+Python 3.11 with this package's dependencies, at the MRIQC commit pinned in ``pyproject.toml``.
+From a clone of this repository:
 
 .. code-block:: bash
 
-   pip install -e .[all]
-   pytest
+   docker run --rm -it --platform linux/amd64 -u "$(id -u):$(id -g)" \
+       -v "$PWD":/work ghcr.io/nipreps/mriqc-flyte:dev
+   pytest   # inside the container
+
+The repository is mounted at ``/work`` and found through ``PYTHONPATH``, so there is nothing to
+install. The image is amd64 only (as MRIQC's): on Apple-silicon Macs, enable Rosetta in Docker
+Desktop. It is built by the *Dev container* workflow from ``Dockerfile`` and
+``docker-bake.hcl``. The onboarding issues (label ``onboarding``) take it from there.
 
 Contributing
 ------------
