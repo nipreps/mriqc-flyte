@@ -5,3 +5,5 @@ Unreleased
   *Dev container* workflow (#1).
 * Dev tooling: the Flyte TUI in the dev image, ruff pinned for the image, CI and pre-commit,
   and the image version labels.
+* Baseline: standard MRIQC run twice on the test T1w, published as a pre-release by the
+  *Baseline* workflow, which also checks the ANTs seeds (#7, #8).
