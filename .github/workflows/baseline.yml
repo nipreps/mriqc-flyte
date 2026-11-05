@@ -1,8 +1,9 @@
 name: Baseline
 
-# Runs standard MRIQC twice on the test T1w (circle-tests sub-50137) in the dev container and
-# compares the two runs: seed checks (#7) and noise floor (#8). A manual run with `publish` set
-# uploads the result as a pre-release, which is what MRIQC_FLYTE_BASELINE points to.
+# Runs MRIQC twice on the test T1w (circle-tests sub-50137) in the dev container, seeded with
+# `--random-seed 42`, and compares the two runs, which should be identical (#7, #8). A manual
+# run with `publish` set uploads the result as a pre-release, which is what MRIQC_FLYTE_BASELINE
+# points to.
 on:
   workflow_dispatch:
     inputs:
@@ -76,10 +77,10 @@ jobs:
             mkdir -p "baseline/run-$i"
             docker run -d --name "run-$i" -u "$(id -u):$(id -g)" \
               -v "$PWD/baseline:/baseline" -v "$PWD/baseline/nipype:/home/mriqc/.nipype:ro" \
-              -e ANTS_RANDOM_SEED=42 "$IMAGE" \
+              "$IMAGE" \
               mriqc /baseline/bids "/baseline/run-$i/out" participant \
                 --participant-label "$PARTICIPANT" -m T1w --omp-nthreads 1 --nprocs 2 \
-                --no-sub --notrack -w "/baseline/run-$i/work"
+                --random-seed 42 --no-sub --notrack -w "/baseline/run-$i/work"
             if (( mem_gb < 14 )); then finish "$i" || status=1; fi
           done
           if (( mem_gb >= 14 )); then
@@ -91,12 +92,15 @@ jobs:
         run: |
           find baseline/run-1/work -name result_pre_n4.pklz | grep .
           find baseline/run-1/out -name "sub-${PARTICIPANT}_T1w.json" | grep .
+          # With --random-seed, Atropos runs with its constant seed
+          find baseline/run-1/work -path '*/segmentation/command.txt' \
+            -exec grep -l -- '--use-random-seed 0' {} + | grep .
 
       - name: Compare the runs
         run: |
           docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:/repo:ro" -v "$PWD/baseline:/baseline" \
             "$IMAGE" python /repo/.maint/compare_baseline_runs.py /baseline/run-1 /baseline/run-2 \
-            --atropos-check /tmp/atropos > report.md
+            > report.md
           # The versions the dev image recorded at build time
           docker run --rm "$IMAGE" cat /opt/mriqc-flyte/versions.json > baseline/versions.json
           digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$IMAGE")

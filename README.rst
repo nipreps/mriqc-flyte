@@ -44,9 +44,10 @@ beside it. The onboarding issues (label ``onboarding``) take it from there.
 The baseline
 ~~~~~~~~~~~~
 The tests compare the port with the **baseline**: standard MRIQC run twice on the test T1w
-(sub-50137 of MRIQC's CI dataset), keeping every node's outputs. It is published as the
-pre-release ``baseline-t1w-d5cb0c82``, which also lists the run-to-run differences (the noise
-floor). Download and unpack it once:
+(sub-50137 of MRIQC's CI dataset), keeping every node's outputs. MRIQC ran with
+``--random-seed 42`` and one thread per process, so the two runs are identical, as the release
+notes show. It is published as the pre-release ``baseline-t1w-d5cb0c82``. Download and unpack
+it once:
 
 .. code-block:: bash
 

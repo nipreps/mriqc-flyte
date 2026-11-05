@@ -9,3 +9,4 @@ Unreleased
   *Baseline* workflow, which also checks the ANTs seeds (#7, #8).
 * MRIQC pinned at d5cb0c82, which adds ``--random-seed`` (nipreps/mriqc#1453). The issues'
   code pointers stay at f6129094.
+* Baseline seeded with ``--random-seed 42``, so that its two runs are identical (#7, #8).

@@ -15,13 +15,11 @@
 
 Usage, inside the dev container, with the baseline at ``/baseline``::
 
-    python .maint/compare_baseline_runs.py /baseline/run-1 /baseline/run-2 \\
-        --atropos-check /tmp/atropos > report.md
+    python .maint/compare_baseline_runs.py /baseline/run-1 /baseline/run-2 > report.md
 
 Prints a Markdown report with three parts:
 
-1. **Seeds (#7):** whether registration and Atropos gave identical outputs in both runs, and,
-   with ``--atropos-check``, whether Atropos becomes identical with ``--use-random-seed 0``.
+1. **Seeds (#7):** whether registration and Atropos gave identical outputs in both runs.
 2. **Steps:** for every NIfTI file in the work directories, whether the two runs agree
    (identical data, or the largest absolute difference).
 3. **Noise floor (#8):** the relative difference of every IQM between the two runs.
@@ -32,8 +30,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import shlex
-import subprocess
 from pathlib import Path
 
 import h5py
@@ -113,29 +109,6 @@ def seed_section(run1: Path, run2: Path) -> list[str]:
     return lines
 
 
-def atropos_fixed_seed(run1: Path, scratch: Path) -> list[str]:
-    """Rerun run 1's Atropos command twice with ``--use-random-seed 0`` and compare."""
-    (seg,) = node_dirs(run1, "segmentation")
-    cmd = (seg / "command.txt").read_text().strip()
-    if "--use-random-seed 1" not in cmd:
-        return [f"- Atropos command has no `--use-random-seed 1`: `{cmd}`"]
-    cmd = cmd.replace("--use-random-seed 1", "--use-random-seed 0")
-    outs = []
-    for i in (1, 2):
-        cwd = scratch / f"atropos-{i}"
-        cwd.mkdir(parents=True, exist_ok=True)
-        subprocess.run(shlex.split(cmd), cwd=cwd, check=True, capture_output=True)
-        outs.append(cwd)
-    names = sorted(p.name for p in outs[0].glob("*.nii.gz"))
-    diffs = {n: image_difference(outs[0] / n, outs[1] / n) for n in names}
-    same = all(d == 0 for d in diffs.values())
-    return [
-        "- Atropos rerun twice with `--use-random-seed 0`: "
-        + ("identical outputs" if same else f"still differs: {diffs}"),
-        f"  (command: `{cmd}`)",
-    ]
-
-
 def steps_section(run1: Path, run2: Path) -> list[str]:
     lines = [
         "## 2. Steps",
@@ -203,17 +176,9 @@ def main():
     )
     parser.add_argument("run1", type=Path)
     parser.add_argument("run2", type=Path)
-    parser.add_argument(
-        "--atropos-check",
-        type=Path,
-        metavar="SCRATCH",
-        help="rerun Atropos with a fixed seed in this folder",
-    )
     args = parser.parse_args()
 
     lines = ["# Baseline runs compared", ""] + seed_section(args.run1, args.run2)
-    if args.atropos_check:
-        lines += atropos_fixed_seed(args.run1, args.atropos_check)
     lines += [""] + steps_section(args.run1, args.run2)
     lines += [""] + iqm_section(args.run1, args.run2)
     print("\n".join(lines))
