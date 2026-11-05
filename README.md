@@ -1,0 +1,1 @@
+Baseline for mriqc-flyte: standard MRIQC (nipreps/mriqc@d5cb0c82) run twice on circle-tests sub-50137. See the release notes.
