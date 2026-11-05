@@ -45,12 +45,12 @@ The baseline
 ~~~~~~~~~~~~
 The tests compare the port with the **baseline**: standard MRIQC run twice on the test T1w
 (sub-50137 of MRIQC's CI dataset), keeping every node's outputs. It is published as the
-pre-release ``baseline-t1w-f6129094``, which also lists the run-to-run differences (the noise
+pre-release ``baseline-t1w-d5cb0c82``, which also lists the run-to-run differences (the noise
 floor). Download and unpack it once:
 
 .. code-block:: bash
 
-   url=https://github.com/nipreps/mriqc-flyte/releases/download/baseline-t1w-f6129094
+   url=https://github.com/nipreps/mriqc-flyte/releases/download/baseline-t1w-d5cb0c82
    mkdir -p baseline && cd baseline
    for f in bids.tar.gz run-1.tar.gz run-2.tar.gz SHA256SUMS; do curl -fLO "$url/$f"; done
    shasum -a 256 -c SHA256SUMS && for f in *.tar.gz; do tar -xzf "$f"; done

@@ -7,3 +7,5 @@ Unreleased
   and the image version labels.
 * Baseline: standard MRIQC run twice on the test T1w, published as a pre-release by the
   *Baseline* workflow, which also checks the ANTs seeds (#7, #8).
+* MRIQC pinned at d5cb0c82, which adds ``--random-seed`` (nipreps/mriqc#1453). The issues'
+  code pointers stay at f6129094.

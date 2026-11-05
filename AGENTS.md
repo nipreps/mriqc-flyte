@@ -35,8 +35,11 @@ Maintainers working outside the student project are not bound by this section.
 ## Layout
 - Source code lives under `src/mriqc_flyte/` and tests under `test/`.
 - Code pointers in issues are permalinks to
-  [nipreps/mriqc@f6129094](https://github.com/nipreps/mriqc/tree/f61290947f6aa79e143e38e314bfd63c09d7384f),
-  the MRIQC version pinned in `pyproject.toml`.
+  [nipreps/mriqc@f6129094](https://github.com/nipreps/mriqc/tree/f61290947f6aa79e143e38e314bfd63c09d7384f).
+  `pyproject.toml` pins a later commit,
+  [nipreps/mriqc@d5cb0c82](https://github.com/nipreps/mriqc/tree/d5cb0c82ba4004f78b9fe982450397907436bb55),
+  which adds `--random-seed`. Line numbers differ between the two in `mriqc/config.py`,
+  `mriqc/cli/parser.py` and `mriqc/workflows/anatomical/base.py`.
 
 ## Checks
 ```bash

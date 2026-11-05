@@ -6,7 +6,7 @@
 #   docker buildx bake dev --set dev.contexts.base=docker-image://<registry>:base-<commit>
 
 variable "MRIQC_SHA" {
-  default = "f61290947f6aa79e143e38e314bfd63c09d7384f"
+  default = "d5cb0c82ba4004f78b9fe982450397907436bb55"
 }
 
 variable "REGISTRY" {
