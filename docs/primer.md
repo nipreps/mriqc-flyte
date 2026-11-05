@@ -54,7 +54,7 @@ makes it easy to check that the port gives the same answers as MRIQC.
 ## 3. The sMRI workflow, step by step
 
 Defined in `anat_qc_workflow`
-([`mriqc/workflows/anatomical/base.py:77`](https://github.com/nipreps/mriqc/blob/f61290947f6aa79e143e38e314bfd63c09d7384f/mriqc/workflows/anatomical/base.py#L77)).
+([`mriqc/workflows/anatomical/base.py:77`](https://github.com/nipreps/mriqc/blob/d5cb0c82ba4004f78b9fe982450397907436bb55/mriqc/workflows/anatomical/base.py#L77)).
 
 1. **Conform**: reorient the image to a standard axis order (RAS).
 2. **Skull-strip** (`synthstrip_wf`, in `mriqc/workflows/shared.py`):

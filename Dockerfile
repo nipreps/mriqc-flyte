@@ -7,7 +7,7 @@
 #
 # Both images are amd64 only, like MRIQC's. Apple-silicon Macs run them through Rosetta.
 
-ARG BASE_IMAGE=ghcr.io/nipreps/mriqc-flyte:base-f6129094
+ARG BASE_IMAGE=ghcr.io/nipreps/mriqc-flyte:base-d5cb0c82
 FROM ${BASE_IMAGE}
 
 # MRIQC's micromamba base already runs Python 3.11 (pinned in /opt/conda/conda-meta/pinned),

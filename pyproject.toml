@@ -21,8 +21,9 @@ requires-python = ">=3.11"
 dependencies = [
   # Flyte 2 releases every one or two weeks: stay on one minor version.
   "flyte ~= 2.12.1",
-  # Pinned to the MRIQC commit that the issues' code pointers refer to.
-  "mriqc @ git+https://github.com/nipreps/mriqc.git@f61290947f6aa79e143e38e314bfd63c09d7384f",
+  # MRIQC with --random-seed (nipreps/mriqc#1453). The issues' code pointers refer to an
+  # earlier commit, f6129094 (see AGENTS.md).
+  "mriqc @ git+https://github.com/nipreps/mriqc.git@d5cb0c82ba4004f78b9fe982450397907436bb55",
 ]
 dynamic = ["version"]
 
