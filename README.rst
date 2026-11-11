@@ -26,7 +26,7 @@ Getting started
 ---------------
 Development happens inside the dev container: MRIQC's own image of the release pinned in
 ``pyproject.toml`` (ANTs, AFNI, SynthStrip, Python 3.13), plus this package's dependencies.
-From a clone of this repository:
+From a clone of your fork (``CONTRIBUTING.md``, *Your fork*):
 
 .. code-block:: bash
 
