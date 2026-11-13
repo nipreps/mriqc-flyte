@@ -1,12 +1,10 @@
-# Build the dev container and its base with `docker buildx bake` (see the Dockerfile).
+# Build the dev container with `docker buildx bake` (see the Dockerfile).
 #
-# The `Dev container` workflow checks MRIQC out into ./mriqc at the commit pinned in
-# pyproject.toml, then runs `docker buildx bake base dev --push`. When the base already exists
-# in the registry, it builds `dev` alone on top of it:
-#   docker buildx bake dev --set dev.contexts.base=docker-image://<registry>:base-<commit>
+# The `Dev container` workflow reads the MRIQC release pinned in pyproject.toml, then runs
+# `docker buildx bake dev --push`. The base is MRIQC's published image of that release.
 
-variable "MRIQC_SHA" {
-  default = "d5cb0c82ba4004f78b9fe982450397907436bb55"
+variable "MRIQC_VERSION" {
+  default = "26.1.0"
 }
 
 variable "REGISTRY" {
@@ -22,6 +20,13 @@ variable "SOURCE" {
   default = "https://github.com/nipreps/mriqc-flyte"
 }
 
+# Both of MRIQC's platforms. A local build for one machine sets
+# `--set dev.platform=linux/amd64` (or arm64), since the default `docker` driver loads a
+# single platform only.
+variable "PLATFORMS" {
+  default = "linux/amd64,linux/arm64"
+}
+
 # The versions the dev image records at build time (JSON, see .maint/image_versions.py), added
 # as labels `org.nipreps.mriqc-flyte.<name>`. The workflow reads them with the `versions`
 # target, then builds `dev` again (all cached) with this variable set.
@@ -33,24 +38,14 @@ group "default" {
   targets = ["dev"]
 }
 
-# MRIQC's own Dockerfile, unchanged, at the pinned commit.
-target "base" {
-  context   = "mriqc"
-  platforms = ["linux/amd64"]
-  args      = { VCS_REF = MRIQC_SHA }
-  labels    = { "org.opencontainers.image.source" = SOURCE }
-  tags      = ["${REGISTRY}:base-${substr(MRIQC_SHA, 0, 8)}"]
-}
-
 target "dev" {
   context   = "."
-  contexts  = { base = "target:base" }
-  args      = { BASE_IMAGE = "base" }
-  platforms = ["linux/amd64"]
+  args      = { BASE_IMAGE = "nipreps/mriqc:${MRIQC_VERSION}" }
+  platforms = split(",", PLATFORMS)
   labels = merge(
     {
       "org.opencontainers.image.source" = SOURCE
-      # Otherwise inherited from Ubuntu's base image (`22.04`, `ubuntu`)
+      # Otherwise inherited from the base image
       "org.opencontainers.image.version"  = notequal(DATE, "") ? "dev-${DATE}" : "dev"
       "org.opencontainers.image.ref.name" = "dev"
     },
@@ -59,7 +54,7 @@ target "dev" {
   tags = compact(["${REGISTRY}:dev", notequal(DATE, "") ? "${REGISTRY}:dev-${DATE}" : ""])
 }
 
-# Copies the dev image's versions.json to ./versions, without exporting the image.
+# Copies the dev image's versions.json (amd64) to ./versions, without exporting the image.
 target "versions" {
   contexts          = { dev = "target:dev" }
   dockerfile-inline = "FROM scratch\nCOPY --from=dev /opt/mriqc-flyte/versions.json /\n"

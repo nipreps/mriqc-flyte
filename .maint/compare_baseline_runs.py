@@ -22,19 +22,21 @@ Prints a Markdown report with three parts:
 1. **Seeds (#7):** whether registration and Atropos gave identical outputs in both runs.
 2. **Steps:** for every NIfTI file in the work directories, whether the two runs agree
    (identical data, or the largest absolute difference).
-3. **Noise floor (#8):** the relative difference of every IQM between the two runs.
+3. **Noise floor (#8):** the relative difference of every IQM between the two runs, read
+   from MRIQC's ``+iqms.parquet`` file, with a check that the ``+iqms.json`` sidecars are
+   byte-identical.
 """
 
 from __future__ import annotations
 
 import argparse
 import hashlib
-import json
 from pathlib import Path
 
 import h5py
 import nibabel as nb
 import numpy as np
+import pandas as pd
 
 
 def sha256(path: Path) -> str:
@@ -137,26 +139,28 @@ def steps_section(run1: Path, run2: Path) -> list[str]:
     return lines
 
 
-def flatten(d: dict, prefix: str = "") -> dict[str, float]:
-    out = {}
-    for key, value in d.items():
-        name = f"{prefix}{key}"
-        if isinstance(value, dict):
-            out.update(flatten(value, f"{name}."))
-        elif isinstance(value, (int, float)) and not isinstance(value, bool):
-            out[name] = float(value)
-    return out
+def numeric_iqms(path: Path) -> dict[str, float]:
+    """The numeric columns of MRIQC's one-row IQM table (text columns, if any, are left out)."""
+    row = pd.read_parquet(path).iloc[0]
+    return {
+        key: float(value)
+        for key, value in row.items()
+        if isinstance(value, (int, float, np.number)) and not isinstance(value, (bool, np.bool_))
+    }
 
 
 def iqm_section(run1: Path, run2: Path) -> list[str]:
-    (j1,) = sorted((run1 / "out").rglob("sub-*_T1w.json"))
-    j2 = run2 / "out" / j1.relative_to(run1 / "out")
-    v1 = flatten(json.loads(j1.read_text()))
-    v2 = flatten(json.loads(j2.read_text()))
+    (p1,) = sorted((run1 / "out").rglob("sub-*_T1w+iqms.parquet"))
+    p2 = run2 / "out" / p1.relative_to(run1 / "out")
+    v1, v2 = numeric_iqms(p1), numeric_iqms(p2)
+    s1, s2 = p1.with_suffix(".json"), p2.with_suffix(".json")
+    sidecars = "byte-identical" if sha256(s1) == sha256(s2) else "different"
     lines = [
         "## 3. Noise floor (#8)",
         "",
-        f"Relative difference |run 2 - run 1| / |run 1| of each IQM in `{j1.name}`.",
+        f"The `{s1.name}` sidecars (BIDS metadata, provenance, column types) are {sidecars}.",
+        "",
+        f"Relative difference |run 2 - run 1| / |run 1| of each IQM in `{p1.name}`.",
         "",
         "| IQM | Run 1 | Run 2 | Relative difference |",
         "|---|---|---|---|",

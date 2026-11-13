@@ -17,6 +17,10 @@ Run by the Dockerfile at build time::
 
     python image_versions.py /opt/mriqc-flyte/versions.json
 
+and by the *Baseline* workflow in MRIQC's own image, where Flyte is missing::
+
+    python image_versions.py --allow-missing /tmp/versions.json
+
 The build fails if a tool is missing or does not report its version. The output is a flat JSON
 object (name to version), which the *Dev container* workflow also copies into the image labels
 ``org.nipreps.mriqc-flyte.<name>``.
@@ -30,14 +34,16 @@ import platform
 import re
 import subprocess
 import sys
-from importlib.metadata import version
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 # Tools that report a version: the command, and the pattern that extracts the version.
+# MRIQC's image ships AFNI's programs but not the `afni` GUI binary, so a program reports it.
+# AFNI programs exit with status 1 after `-ver`: the version pattern is the check.
 TOOLS = {
     "ants": (["antsRegistration", "--version"], r"ANTs Version: (\S+)"),
-    "afni": (["afni", "-ver"], r"Version (AFNI_[\w.]+)"),
-    "mrtrix3": (["dwidenoise", "--version"], r"dwidenoise (\d[\w.]*)"),
+    "afni": (["3dFWHMx", "-ver"], r"AFNI version=(AFNI_[\w.]+)"),
+    "svht_denoise": (["svht_denoise", "--version"], r"svht_denoise (\S+)"),
 }
 # Tools that only need to start.
 CHECKS = (
@@ -60,29 +66,36 @@ PACKAGES = (
     "dipy",
     "torch",
     "templateflow",
+    "pandas",
+    "pyarrow",
 )
 
 
-def run(cmd: list[str]) -> str:
+def run(cmd: list[str], check: bool = True) -> str:
     """Run a command and return what it prints (stdout and stderr)."""
     return subprocess.run(
-        cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+        cmd, check=check, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
     ).stdout
 
 
-def main(out: Path) -> None:
+def main(out: Path, allow_missing: bool = False) -> None:
     for cmd in CHECKS:
         run(cmd)
 
     versions = {"python": platform.python_version()}
     for name, (cmd, pattern) in TOOLS.items():
-        match = re.search(pattern, run(cmd))
+        match = re.search(pattern, run(cmd, check=False))
         if match is None:
             sys.exit(f"Cannot read the version of {name} from `{' '.join(cmd)}`")
         versions[name] = match.group(1)
     digest = hashlib.sha256(SYNTHSTRIP_MODEL.read_bytes()).hexdigest()
     versions["synthstrip-model"] = f"sha256:{digest[:12]}"
-    versions.update((name, version(name)) for name in PACKAGES)
+    for name in PACKAGES:
+        try:
+            versions[name] = version(name)
+        except PackageNotFoundError:
+            if not allow_missing:
+                raise
 
     # A wheel built from git without its tags reports 0.0, which would then go into the
     # provenance of every IQM file.
@@ -95,4 +108,7 @@ def main(out: Path) -> None:
 
 
 if __name__ == "__main__":
-    main(Path(sys.argv[1]))
+    args = sys.argv[1:]
+    allow_missing = "--allow-missing" in args
+    (out,) = (a for a in args if a != "--allow-missing")
+    main(Path(out), allow_missing)

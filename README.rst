@@ -24,37 +24,40 @@ and `docs/primer.md <docs/primer.md>`__ for a primer on MRIQC and Flyte.
 
 Getting started
 ---------------
-Development happens inside the dev container, which provides ANTs, AFNI, SynthStrip and
-Python 3.11 with this package's dependencies, at the MRIQC commit pinned in ``pyproject.toml``.
-From a clone of this repository:
+Development happens inside the dev container: MRIQC's own image of the release pinned in
+``pyproject.toml`` (ANTs, AFNI, SynthStrip, Python 3.13), plus this package's dependencies.
+From a clone of your fork (``CONTRIBUTING.md``, *Your fork*):
 
 .. code-block:: bash
 
-   docker run --rm -it --platform linux/amd64 -u "$(id -u):$(id -g)" \
-       -v "$PWD":/work ghcr.io/nipreps/mriqc-flyte:dev
+   docker run --rm -it -u "$(id -u):$(id -g)" -v "$PWD":/work ghcr.io/nipreps/mriqc-flyte:dev
    pytest   # inside the container
 
 The repository is mounted at ``/work`` and found through ``PYTHONPATH``, so there is nothing to
-install. The image is amd64 only (as MRIQC's): on Apple-silicon Macs, enable Rosetta in Docker
-Desktop. It is built by the *Dev container* workflow from ``Dockerfile`` and
+install. The image runs natively on ``linux/amd64`` and ``linux/arm64`` (Apple-silicon Macs),
+as MRIQC's. It is built by the *Dev container* workflow from ``Dockerfile`` and
 ``docker-bake.hcl``. The versions of its tools and main packages are in the image labels
 (``docker inspect``) and in ``/opt/mriqc-flyte/versions.json``, with the full package lists
 beside it. The onboarding issues (label ``onboarding``) take it from there.
 
 The baseline
 ~~~~~~~~~~~~
-The tests compare the port with the **baseline**: standard MRIQC run twice on the test T1w
-(sub-50137 of MRIQC's CI dataset), keeping every node's outputs. MRIQC ran with
-``--random-seed 42`` and one thread per process, so the two runs are identical, as the release
-notes show. It is published as the pre-release ``baseline-t1w-d5cb0c82``. Download and unpack
-it once:
+The tests compare the port with the **baseline**: standard MRIQC (the pinned release, in its
+own image) run twice on the test T1w (sub-50137 of MRIQC's CI dataset), keeping every node's
+outputs. MRIQC ran with ``--random-seed 42`` and one thread per process, so the two runs are
+identical, as the release notes show. MRIQC's numbers differ slightly between ``amd64`` and
+``arm64``, so the baseline has a pair of runs for each: take the one of your machine. It is
+published as the pre-release ``baseline-t1w-26.1.0``. Download and unpack it once:
 
 .. code-block:: bash
 
-   url=https://github.com/nipreps/mriqc-flyte/releases/download/baseline-t1w-d5cb0c82
+   url=https://github.com/nipreps/mriqc-flyte/releases/download/baseline-t1w-26.1.0
+   case "$(uname -m)" in x86_64) arch=amd64 ;; *) arch=arm64 ;; esac
    mkdir -p baseline && cd baseline
-   for f in bids.tar.gz run-1.tar.gz run-2.tar.gz SHA256SUMS; do curl -fLO "$url/$f"; done
-   shasum -a 256 -c SHA256SUMS && for f in *.tar.gz; do tar -xzf "$f"; done
+   for f in bids.tar.gz run-1-$arch.tar.gz run-2-$arch.tar.gz SHA256SUMS; do
+       curl -fLO "$url/$f"
+   done
+   grep -E "bids|$arch" SHA256SUMS | shasum -a 256 -c && for f in *.tar.gz; do tar -xzf "$f"; done
    cd ..
 
 Then mount it at ``/baseline`` and point ``MRIQC_FLYTE_BASELINE`` to it. The baseline was
@@ -62,11 +65,23 @@ produced there, so the paths stored in its result files resolve as they are:
 
 .. code-block:: bash
 
-   docker run --rm -it --platform linux/amd64 -u "$(id -u):$(id -g)" \
+   docker run --rm -it -u "$(id -u):$(id -g)" \
        -v "$PWD":/work -v "$PWD/baseline":/baseline:ro -e MRIQC_FLYTE_BASELINE=/baseline \
        ghcr.io/nipreps/mriqc-flyte:dev
 
 The tests that need it are skipped when ``MRIQC_FLYTE_BASELINE`` is unset, as on GitHub Actions.
+
+With the baseline mounted, the tests run the real programs, so a plain ``pytest`` grows to
+minutes as the port does (about 12 min for the whole sMRI port, on a recent x86 machine). The
+tests that run the whole pipeline carry the ``pipeline`` marker, and a plain ``pytest`` leaves
+them out: run them before opening a pull request that changes the pipeline. For a quick check,
+run one file, or the tests GitHub Actions runs (under a minute):
+
+.. code-block:: bash
+
+   pytest -m pipeline   # the end-to-end tests only
+   pytest test/test_<one file>.py
+   pytest -m "not baseline and not binaries"
 
 Contributing
 ------------
