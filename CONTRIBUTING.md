@@ -4,7 +4,7 @@
 whose contributing guidelines apply. This file adds the conventions specific to this repository.
 
 ## Picking work
-- Every piece of work has an issue. The [project board](https://github.com/orgs/nipreps/projects)
+- Every piece of work has an issue. The [project board](https://github.com/orgs/nipreps/projects/18)
   shows the tier (core, stretch, later), the planned week and the dependencies.
 - The core tier is the roadmap of the sMRI port, not a quota: its hours add up to more than a
   semester project, and nobody expects all of it. Each week, the sync-up picks what comes

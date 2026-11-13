@@ -122,6 +122,8 @@ norecursedirs = [".*", "_*"]
 addopts = "-v --doctest-modules --strict-markers -m 'not pipeline'"
 doctest_optionflags = "ALLOW_UNICODE NORMALIZE_WHITESPACE ELLIPSIS"
 env = "PYTHONHASHSEED=0"
+# pytest-asyncio warns at every run unless this is set
+asyncio_default_fixture_loop_scope = "function"
 markers = [
   "baseline: needs the nipype baseline outputs (set MRIQC_FLYTE_BASELINE)",
   "binaries: needs ANTs, AFNI and SynthStrip on the PATH (run in the dev container)",
