@@ -1,0 +1,1 @@
+Baseline for mriqc-flyte: standard MRIQC 26.1.0 run twice on circle-tests sub-50137, on linux/amd64 and linux/arm64. See the release notes.
