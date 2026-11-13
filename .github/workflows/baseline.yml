@@ -1,15 +1,17 @@
 name: Baseline
 
-# Runs MRIQC twice on the test T1w (circle-tests sub-50137) in the dev container, seeded with
-# `--random-seed 42`, and compares the two runs, which should be identical (#7, #8). A manual
-# run with `publish` set uploads the result as a pre-release, which is what MRIQC_FLYTE_BASELINE
-# points to.
+# Runs MRIQC twice on the test T1w (circle-tests sub-50137) in MRIQC's own image of the release
+# pinned in pyproject.toml (the dev container's base), seeded with `--random-seed 42`, and
+# compares the two runs, which should be identical (#7, #8). It runs on linux/amd64 and on
+# linux/arm64, since MRIQC's IQMs differ slightly between the two. A manual run with `publish`
+# set uploads the result as a pre-release, one pair of runs per platform, which is what
+# MRIQC_FLYTE_BASELINE points to.
 on:
   workflow_dispatch:
     inputs:
       image:
-        description: Dev container image
-        default: ghcr.io/nipreps/mriqc-flyte:dev
+        description: Image to run MRIQC in (default, MRIQC's image of the pinned release)
+        default: ''
       publish:
         description: Publish the baseline as a pre-release
         type: boolean
@@ -21,33 +23,42 @@ on:
       - '.maint/compare_baseline_runs.py'
 
 permissions:
-  # Publishing creates a tag and a release
   contents: write
 
 env:
-  IMAGE: ${{ inputs.image || 'ghcr.io/nipreps/mriqc-flyte:dev' }}
   PARTICIPANT: '50137'
-  # MRIQC's CI dataset (as in its .circleci/config.yml)
   DATASET: https://files.osf.io/v1/resources/fvuh8/providers/osfstorage/5b6c9950fed49e001a7885b6
 
 jobs:
   baseline:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # GitHub's arm64 runners are free for public repositories only.
+        platform: >-
+          ${{ fromJSON(github.event.repository.private && '["amd64"]' || '["amd64", "arm64"]') }}
+    runs-on: ${{ matrix.platform == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     timeout-minutes: 240
     steps:
       - uses: actions/checkout@v5
 
-      - name: Free disk space (the dev container is about 20 GB unpacked)
+      - name: Read the image (MRIQC's, at the release pinned in pyproject.toml)
+        run: |
+          version=$(grep -oE '"mriqc == [0-9.]+"' pyproject.toml | grep -oE '[0-9.]+')
+          image="${{ inputs.image || '' }}"
+          echo "IMAGE=${image:-nipreps/mriqc:$version}" >> "$GITHUB_ENV"
+
+      - name: Free disk space (MRIQC's image is about 10 GB unpacked)
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache \
             /usr/local/share/boost
           docker system prune -af
           df -h /
 
-      - name: Pull the dev container
+      - name: Pull the image
         run: |
           docker pull "$IMAGE"
-          docker inspect --format '{{index .RepoDigests 0}}' "$IMAGE"
+          docker inspect --format '{{index .RepoDigests 0}} {{.Architecture}}' "$IMAGE"
 
       - name: Prepare the BIDS dataset (one participant) and the nipype configuration
         run: |
@@ -57,13 +68,10 @@ jobs:
           src="$RUNNER_TEMP/dl/circle-tests"
           cp "$src/dataset_description.json" "$src/README" "$src/CHANGES" baseline/bids/
           cp -r "$src/sub-$PARTICIPANT" baseline/bids/
-          # Keep every node's outputs, so that each step can be tested on its own
           printf '[execution]\nremove_unnecessary_outputs = false\n' > baseline/nipype/nipype.cfg
 
       - name: Run MRIQC twice
         run: |
-          # Side by side on runners with 16 GB (public repositories), one after the other on
-          # smaller ones (private forks), to stay within memory
           mem_gb=$(free -g | awk '/^Mem:/ {print $2}')
           echo "$(nproc) CPUs, $mem_gb GB"
           finish() {
@@ -77,8 +85,7 @@ jobs:
             mkdir -p "baseline/run-$i"
             docker run -d --name "run-$i" -u "$(id -u):$(id -g)" \
               -v "$PWD/baseline:/baseline" -v "$PWD/baseline/nipype:/home/mriqc/.nipype:ro" \
-              "$IMAGE" \
-              mriqc /baseline/bids "/baseline/run-$i/out" participant \
+              --entrypoint mriqc "$IMAGE" /baseline/bids "/baseline/run-$i/out" participant \
                 --participant-label "$PARTICIPANT" -m T1w --omp-nthreads 1 --nprocs 2 \
                 --random-seed 42 --no-sub --notrack -w "/baseline/run-$i/work"
             if (( mem_gb < 14 )); then finish "$i" || status=1; fi
@@ -91,7 +98,8 @@ jobs:
       - name: Check the files the issues rely on
         run: |
           find baseline/run-1/work -name result_pre_n4.pklz | grep .
-          find baseline/run-1/out -name "sub-${PARTICIPANT}_T1w.json" | grep .
+          find baseline/run-1/out -name "sub-${PARTICIPANT}_T1w+iqms.parquet" | grep .
+          find baseline/run-1/out -name "sub-${PARTICIPANT}_T1w+iqms.json" | grep .
           # With --random-seed, Atropos runs with its constant seed
           find baseline/run-1/work -path '*/segmentation/command.txt' \
             -exec grep -l -- '--use-random-seed 0' {} + | grep .
@@ -99,46 +107,67 @@ jobs:
       - name: Compare the runs
         run: |
           docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:/repo:ro" -v "$PWD/baseline:/baseline" \
-            "$IMAGE" python /repo/.maint/compare_baseline_runs.py /baseline/run-1 /baseline/run-2 \
-            > report.md
-          # The versions the dev image recorded at build time
-          docker run --rm "$IMAGE" cat /opt/mriqc-flyte/versions.json > baseline/versions.json
+            --entrypoint python "$IMAGE" /repo/.maint/compare_baseline_runs.py \
+            /baseline/run-1 /baseline/run-2 > report.md
+          # The tools and packages of the image (Flyte is only in the dev container)
+          docker run --rm -v "$PWD:/repo:ro" --entrypoint python "$IMAGE" \
+            /repo/.maint/image_versions.py --allow-missing /tmp/versions.json \
+            > baseline/versions.json
           digest=$(docker inspect --format '{{index .RepoDigests 0}}' "$IMAGE")
-          { cat report.md; echo; echo '## Versions'; echo; echo "Image: \`$digest\`"; echo
-            echo '```json'; cat baseline/versions.json; echo '```'; } \
-            | tee -a "$GITHUB_STEP_SUMMARY" > notes.md
+          { echo "# linux/${{ matrix.platform }}"; echo; cat report.md; echo
+            echo '## Versions'; echo; echo "Image: \`$digest\` (linux/${{ matrix.platform }})"
+            echo; echo '```json'; cat baseline/versions.json; echo '```'; } \
+            | tee -a "$GITHUB_STEP_SUMMARY" > "notes-${{ matrix.platform }}.md"
 
       - name: Package
         run: |
-          cp notes.md baseline/report.md
+          p=${{ matrix.platform }}
+          cp "notes-$p.md" baseline/report.md
           tar -czf bids.tar.gz -C baseline bids
-          for i in 1 2; do tar -czf "run-$i.tar.gz" -C baseline "run-$i"; done
-          sha256sum bids.tar.gz run-1.tar.gz run-2.tar.gz > SHA256SUMS
+          for i in 1 2; do tar -czf "run-$i-$p.tar.gz" -C baseline "run-$i"; done
           ls -la ./*.tar.gz
           # Release assets must stay under 2 GB each
           find . -maxdepth 1 -name '*.tar.gz' -size +1900M | (! grep .)
 
       - uses: actions/upload-artifact@v4
         with:
-          name: baseline-report
+          name: baseline-${{ matrix.platform }}
           path: |
-            notes.md
-            SHA256SUMS
+            notes-${{ matrix.platform }}.md
+            bids.tar.gz
+            run-1-${{ matrix.platform }}.tar.gz
+            run-2-${{ matrix.platform }}.tar.gz
+          retention-days: 7
+
+  publish:
+    needs: baseline
+    if: github.event_name == 'workflow_dispatch' && inputs.publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          merge-multiple: true
 
       - name: Publish the pre-release
-        if: github.event_name == 'workflow_dispatch' && inputs.publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          sha=$(grep -oE 'mriqc\.git@[0-9a-f]{40}' pyproject.toml | cut -d@ -f2)
-          tag="baseline-t1w-${sha:0:8}"
+          version=$(grep -oE '"mriqc == [0-9.]+"' pyproject.toml | grep -oE '[0-9.]+')
+          tag="baseline-t1w-$version"
+          cd assets
+          # bids.tar.gz is the same input on both platforms: keep one copy
+          sha256sum bids.tar.gz run-*.tar.gz > SHA256SUMS
+          cat notes-*.md > notes.md
           # The tag points to a commit outside main's history, so that `git describe` on main
           # (hatch-vcs versions) never sees it.
-          readme="Baseline for mriqc-flyte: standard MRIQC (nipreps/mriqc@${sha:0:8}) run twice on circle-tests sub-$PARTICIPANT. See the release notes."
+          readme="Baseline for mriqc-flyte: standard MRIQC $version run twice on circle-tests sub-$PARTICIPANT, on linux/amd64 and linux/arm64. See the release notes."
           tree=$(gh api "repos/$GITHUB_REPOSITORY/git/trees" -f 'tree[][path]=README.md' \
             -f 'tree[][mode]=100644' -f 'tree[][type]=blob' -f "tree[][content]=$readme" --jq .sha)
           commit=$(gh api "repos/$GITHUB_REPOSITORY/git/commits" -f "message=$tag" -f "tree=$tree" \
             --jq .sha)
-          gh release create "$tag" --target "$commit" --prerelease \
-            --title "Baseline: MRIQC on the test T1w (sub-$PARTICIPANT, mriqc@${sha:0:8})" \
-            --notes-file notes.md bids.tar.gz run-1.tar.gz run-2.tar.gz SHA256SUMS
+          gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$commit" --prerelease \
+            --title "Baseline: MRIQC $version on the test T1w (sub-$PARTICIPANT)" \
+            --notes-file notes.md bids.tar.gz run-*.tar.gz SHA256SUMS

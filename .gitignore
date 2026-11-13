@@ -132,3 +132,6 @@ scratch/
 
 # Versions extracted from the dev image (docker buildx bake versions)
 /versions/
+
+# Test data (circle-tests, see the onboarding issues)
+/data/

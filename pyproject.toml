@@ -11,19 +11,18 @@ classifiers = [
   "Development Status :: 2 - Pre-Alpha",
   "Intended Audience :: Science/Research",
   "Topic :: Scientific/Engineering :: Image Recognition",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
 ]
 license = "Apache-2.0"
 license-files = ["LICEN[CS]E*", "NOTICE"]
-# 3.11 is the Python of MRIQC's image, which the dev container builds on.
-requires-python = ">=3.11"
+# As MRIQC 26: its image, which the dev container builds on, runs Python 3.13.
+requires-python = ">=3.13"
 dependencies = [
   # Flyte 2 releases every one or two weeks: stay on one minor version.
   "flyte ~= 2.12.1",
-  # MRIQC with --random-seed (nipreps/mriqc#1453). The issues' code pointers refer to an
-  # earlier commit, f6129094 (see AGENTS.md).
-  "mriqc @ git+https://github.com/nipreps/mriqc.git@d5cb0c82ba4004f78b9fe982450397907436bb55",
+  # The MRIQC release the dev container is built on, and the issues' code pointers refer to.
+  "mriqc == 26.1.0",
 ]
 dynamic = ["version"]
 
@@ -57,9 +56,6 @@ all = ["mriqc-flyte[dev,test]"]
 # Hatch configurations
 #
 
-[tool.hatch.metadata]
-allow-direct-references = true
-
 [tool.hatch.build.targets.sdist]
 exclude = [
   ".git_archival.txt",
@@ -90,7 +86,7 @@ version-file = "src/mriqc_flyte/_version.py"
 
 [tool.ruff]
 line-length = 99
-target-version = "py311"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = [
@@ -120,13 +116,16 @@ known-first-party = ["mriqc_flyte"]
 
 [tool.pytest.ini_options]
 pythonpath = "src/ test/"
+# Only the code: a dataset unpacked in the repo can hold scripts that fail on import
+testpaths = ["src", "test"]
 norecursedirs = [".*", "_*"]
-addopts = "-v --doctest-modules --strict-markers"
+addopts = "-v --doctest-modules --strict-markers -m 'not pipeline'"
 doctest_optionflags = "ALLOW_UNICODE NORMALIZE_WHITESPACE ELLIPSIS"
 env = "PYTHONHASHSEED=0"
 markers = [
   "baseline: needs the nipype baseline outputs (set MRIQC_FLYTE_BASELINE)",
   "binaries: needs ANTs, AFNI and SynthStrip on the PATH (run in the dev container)",
+  "pipeline: runs the whole sMRI pipeline (minutes per scan): left out unless `-m pipeline`",
 ]
 
 [tool.coverage.run]
